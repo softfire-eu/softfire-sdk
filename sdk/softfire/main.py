@@ -7,8 +7,8 @@ from random import randint
 
 import grpc
 
-from eu.softfire.grpc import messages_pb2_grpc, messages_pb2
-from eu.softfire.utils import get_config
+from sdk.softfire.grpc import messages_pb2_grpc, messages_pb2
+from sdk.softfire.utils import get_config
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
@@ -69,10 +69,9 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
 
     def refresh_resources(self, request, context):
         try:
-            return messages_pb2.ResponseMessage(result=0,
-                                                list_resource=self.abstract_manager.refresh_resources(
-                                                    user_info=request)
-                                                )
+            resources = self.abstract_manager.refresh_resources(user_info=request)
+            response = messages_pb2.ListResourceResponse(resources=resources)
+            return messages_pb2.ResponseMessage(result=0, list_resource=response)
         except Exception as e:
             if hasattr(e, "message"):
                 return messages_pb2.ResponseMessage(result=2, error_message=e.message)
