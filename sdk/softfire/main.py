@@ -71,40 +71,47 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
         try:
             resources = self.abstract_manager.refresh_resources(user_info=request)
             response = messages_pb2.ListResourceResponse(resources=resources)
-            return messages_pb2.ResponseMessage(result=0, list_resource=response)
+            return messages_pb2.ResponseMessage(result=messages_pb2.Ok, list_resource=response)
         except Exception as e:
             if hasattr(e, "message"):
-                return messages_pb2.ResponseMessage(result=2, error_message=e.message)
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
             if hasattr(e, "args"):
-                return messages_pb2.ResponseMessage(result=2, error_message=e.args)
-            return messages_pb2.ResponseMessage(result=2, error_message="No message available")
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.args)
+            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
 
     def execute(self, request, context):
         if request.method == messages_pb2.LIST_RESOURCES:
             try:
-                return messages_pb2.ResponseMessage(result=0,
+                return messages_pb2.ResponseMessage(result=messages_pb2.Ok,
                                                     list_resource=messages_pb2.ListResourceResponse(
                                                         resources=self.abstract_manager.list_resources(
                                                             user_info=request.user_info,
                                                             payload=request.payload)))
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=2, error_message=e)
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
         if request.method == messages_pb2.PROVIDE_RESOURCES:
             try:
-                return messages_pb2.ResponseMessage(result=0,
+                return messages_pb2.ResponseMessage(result=messages_pb2.Ok,
                                                     provide_resource=messages_pb2.ProvideResourceResponse(
                                                         resources=[messages_pb2.Resource(content=r) for r in
                                                                    self.abstract_manager.provide_resources(
                                                                        user_info=request.user_info,
                                                                        payload=request.payload)]))
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=2, error_message=e)
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
         if request.method == messages_pb2.RELEASE_RESOURCES:
             try:
                 self.abstract_manager.release_resources(user_info=request.user_info, payload=request.payload)
-                return messages_pb2.ResponseMessage(result=0)
+                return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=2, error_message=e)
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
+
+        if request.method == messages_pb2.VALIDATE_RESOURCES:
+            try:
+                self.abstract_manager.validate_resources(user_info=request.user_info, payload=request.payload)
+                return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
+            except Exception as e:
+                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
 
 
 def start_manager(manager_instance, config_file_path):

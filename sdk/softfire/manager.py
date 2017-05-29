@@ -1,9 +1,11 @@
 from abc import ABCMeta, abstractmethod
 
+from sdk.softfire.grpc.messages_pb2 import UserInfo
+
 
 class AbstractManager(metaclass=ABCMeta):
     @abstractmethod
-    def list_resources(self, user_info=None, payload=None):
+    def list_resources(self, user_info=None, payload=None) -> list:
         """
         List all available resources
         
@@ -13,7 +15,17 @@ class AbstractManager(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def provide_resources(self, user_info, payload=None):
+    def validate_resources(self, user_info=None, payload=None) -> None:
+        """
+        Validate the resources
+
+        :param payload: 
+        :raise any exception for error
+        """
+        pass
+
+    @abstractmethod
+    def provide_resources(self, user_info, payload=None) -> list:
         """
         Deploy the specific resources
         Must return a list of JSON string representing the deployed resources
@@ -26,7 +38,7 @@ class AbstractManager(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def release_resources(self, user_info, payload=None):
+    def release_resources(self, user_info, payload=None) -> None:
         """
         Release resources of that user
         :param payload: 
@@ -46,7 +58,7 @@ class AbstractManager(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def refresh_resources(self, user_info):
+    def refresh_resources(self, user_info) -> list:
         """
         refresh the list of resources. Same as list resources
         :param user_info: the User requesting
