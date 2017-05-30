@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 import time
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
@@ -114,6 +115,13 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
                 return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
 
 
+def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(2)
+    result = sock.connect_ex((ex_man_bind_ip, int(ex_man_bind_port)))
+    return result == 0
+
+
 def start_manager(manager_instance, config_file_path):
     """
     Start the ExperimentManager
@@ -121,6 +129,11 @@ def start_manager(manager_instance, config_file_path):
     :param manager_instance: the instance of the Manager
     """
     logging.info("Starting %s Manager." % get_config('system', 'name', config_file_path, ''))
+
+    if get_config("system", "wait_for_em", config_file_path, "true") == "true":
+        while not _is_ex_man__running(get_config("system", "experiment_manager_ip", config_file_path, "localhost"),
+                                      get_config("system", "experiment_manager_port", config_file_path, "50051")):
+            time.sleep(2)
 
     executor = ProcessPoolExecutor(5)
     loop = asyncio.get_event_loop()

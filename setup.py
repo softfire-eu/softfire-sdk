@@ -15,7 +15,7 @@ def read(fname):
 
 setup(
     name="softfire-sdk",
-    version="0.0.3",
+    version="0.0.4",
     author="Lorenzo Tomasini",
     author_email="lorenzo.tomasini@gmail.com",
     description="The SoftFIRE SDK for Manager",
