@@ -1,5 +1,8 @@
 from abc import ABCMeta, abstractmethod
 
+import grpc
+
+from sdk.softfire.grpc import messages_pb2_grpc, messages_pb2
 from sdk.softfire.utils import get_config
 
 
@@ -72,10 +75,23 @@ class AbstractManager(metaclass=ABCMeta):
         """
         pass
 
-    def update_status(self) -> list:
+    def _update_status(self) -> list:
         """
         update the status of the experiments in case of value change
 
         :return: list of json strings representing the value of the resources changed
         """
-        pass
+        list()
+
+    def send_update(self):
+        resources = self._update_status()
+        if len(resources):
+            channel = grpc.insecure_channel(
+                '%s:%s' % (self.get_config_value("system", "experiment_manager_ip", "localhost"),
+                           self.get_config_value("system", "experiment_manager_port", "5051")))
+            stub = messages_pb2_grpc.RegistrationServiceStub(channel=channel)
+            status_message = messages_pb2.StatusMessage(
+                resources=resources,
+                manager_name=self.get_config_value('system', 'name')
+            )
+            stub.update_status(status_message)

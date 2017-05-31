@@ -147,16 +147,3 @@ def start_manager(manager_instance):
         logging.info("received ctrl-c, shutting down...")
         loop.close()
         _unregister(manager_instance.config_file_path)
-
-
-def send_updates(manager_instance):
-    channel = grpc.insecure_channel(
-        '%s:%s' % (manager_instance.get_config_value("system", "experiment_manager_ip", "localhost"),
-                   manager_instance.get_config_value("system", "experiment_manager_port", "5051")))
-    stub = messages_pb2_grpc.RegistrationServiceStub(channel=channel)
-    status_message = messages_pb2.StatusMessage(
-        resources=manager_instance.update_status(),
-        manager_name=manager_instance.get_config_value('system', 'name')
-    )
-    response = stub.update_status(status_message)
-    logging.debug("Got result from update_status: %s" % response)
