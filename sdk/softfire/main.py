@@ -66,7 +66,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
         self.abstract_manager = abstract_manager
 
     def create_user(self, request, context):
-        return self.abstract_manager.create_user(request.name, request.password)
+        return self.abstract_manager.create_user(request)
 
     def refresh_resources(self, request, context):
         try:
