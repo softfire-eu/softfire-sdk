@@ -75,23 +75,31 @@ class AbstractManager(metaclass=ABCMeta):
         """
         pass
 
-    def _update_status(self) -> list:
+    def _update_status(self) -> dict:
         """
         update the status of the experiments in case of value change
 
-        :return: list of json strings representing the value of the resources changed
+        :return: dict as
+        {
+            'test':[],
+            'test2':[]
+        }
         """
-        list()
+        return dict()
 
     def send_update(self):
-        resources = self._update_status()
-        if len(resources):
+        resources_per_experimenter = self._update_status()
+        if len(resources_per_experimenter):
             channel = grpc.insecure_channel(
                 '%s:%s' % (self.get_config_value("system", "experiment_manager_ip", "localhost"),
                            self.get_config_value("system", "experiment_manager_port", "5051")))
             stub = messages_pb2_grpc.RegistrationServiceStub(channel=channel)
-            status_message = messages_pb2.StatusMessage(
-                resources=resources,
-                manager_name=self.get_config_value('system', 'name')
-            )
-            stub.update_status(status_message)
+            manager_name = self.get_config_value('system', 'name')
+            for username, resources in resources_per_experimenter.items():
+                rpc_res = [messages_pb2.Resource(content=nsr) for nsr in resources]
+                status_message = messages_pb2.StatusMessage(
+                    resources=rpc_res,
+                    username=username,
+                    manager_name=manager_name
+                )
+                stub.update_status(status_message)
