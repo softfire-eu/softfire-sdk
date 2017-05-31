@@ -14,11 +14,11 @@ from sdk.softfire.utils import get_config
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
-def _receive_forever(manager_instance, config_file_path):
+def _receive_forever(manager_instance):
     server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=int(get_config('system', 'server_threads', config_file_path, '5'))))
+        futures.ThreadPoolExecutor(max_workers=int(manager_instance.get_config_value('system', 'server_threads', '5'))))
     messages_pb2_grpc.add_ManagerAgentServicer_to_server(_ManagerAgent(manager_instance), server)
-    binding = '[::]:%s' % get_config('messaging', 'bind_port', config_file_path, randint(1025, 65535))
+    binding = '[::]:%s' % manager_instance.get_config_value('messaging', 'bind_port')
     logging.info("Start listening on %s" % binding)
     server.add_insecure_port(binding)
     server.start()
@@ -122,28 +122,41 @@ def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
     return result == 0
 
 
-def start_manager(manager_instance, config_file_path):
+def start_manager(manager_instance):
     """
     Start the ExperimentManager
     :param config_file_path: path to the config file
     :param manager_instance: the instance of the Manager
     """
-    logging.info("Starting %s Manager." % get_config('system', 'name', config_file_path, ''))
+    logging.info("Starting %s Manager." % manager_instance.get_config_value('system', 'name'))
 
-    if get_config("system", "wait_for_em", config_file_path, "true") == "true":
-        while not _is_ex_man__running(get_config("system", "experiment_manager_ip", config_file_path, "localhost"),
-                                      get_config("system", "experiment_manager_port", config_file_path, "50051")):
+    if manager_instance.get_config_value("system", "wait_for_em", "true") == "true":
+        while not _is_ex_man__running(manager_instance.get_config_value("system", "experiment_manager_ip", "localhost"),
+                                      manager_instance.get_config_value("system", "experiment_manager_port", "5051")):
             time.sleep(2)
 
     executor = ProcessPoolExecutor(5)
     loop = asyncio.get_event_loop()
 
-    asyncio.ensure_future(loop.run_in_executor(executor, _receive_forever, manager_instance, config_file_path))
-    asyncio.ensure_future(loop.run_in_executor(executor, _register, config_file_path))
+    asyncio.ensure_future(loop.run_in_executor(executor, _receive_forever, manager_instance))
+    asyncio.ensure_future(loop.run_in_executor(executor, _register, manager_instance.config_file_path))
 
     try:
         loop.run_forever()
     except KeyboardInterrupt:
         logging.info("received ctrl-c, shutting down...")
         loop.close()
-        _unregister(config_file_path)
+        _unregister(manager_instance.config_file_path)
+
+
+def send_updates(manager_instance):
+    channel = grpc.insecure_channel(
+        '%s:%s' % (manager_instance.get_config_value("system", "experiment_manager_ip", "localhost"),
+                   manager_instance.get_config_value("system", "experiment_manager_port", "5051")))
+    stub = messages_pb2_grpc.RegistrationServiceStub(channel=channel)
+    status_message = messages_pb2.StatusMessage(
+        resources=manager_instance.update_status(),
+        manager_name=manager_instance.get_config_value('system', 'name')
+    )
+    response = stub.update_status(status_message)
+    logging.debug("Got result from update_status: %s" % response)

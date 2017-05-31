@@ -1,9 +1,15 @@
 from abc import ABCMeta, abstractmethod
 
-from sdk.softfire.grpc.messages_pb2 import UserInfo
+from sdk.softfire.utils import get_config
 
 
 class AbstractManager(metaclass=ABCMeta):
+    def __init__(self, config_file_path):
+        self.config_file_path = config_file_path
+
+    def get_config_value(self, section, key, default=None):
+        return get_config(section=section, key=key, default=default, config_file_path=self.config_file_path)
+
     @abstractmethod
     def list_resources(self, user_info=None, payload=None) -> list:
         """
@@ -63,5 +69,13 @@ class AbstractManager(metaclass=ABCMeta):
         refresh the list of resources. Same as list resources
         :param user_info: the User requesting
         :return: list of ResourceMetadata
+        """
+        pass
+
+    def update_status(self) -> list:
+        """
+        update the status of the experiments in case of value change
+
+        :return: list of json strings representing the value of the resources changed
         """
         pass
