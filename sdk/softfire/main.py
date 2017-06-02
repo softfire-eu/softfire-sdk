@@ -29,6 +29,7 @@ def _receive_forever(manager_instance):
 
 
 def _register(config_file_path):
+    time.sleep(1)
     channel = grpc.insecure_channel(
         '%s:%s' % (get_config("system", "experiment_manager_ip", config_file_path),
                    get_config("system", "experiment_manager_port", config_file_path)))
