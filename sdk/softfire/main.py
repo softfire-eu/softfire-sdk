@@ -4,7 +4,6 @@ import socket
 import time
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
-from random import randint
 
 import grpc
 
@@ -143,7 +142,12 @@ def start_manager(manager_instance):
 
     try:
         loop.run_forever()
+    except Exception:
+        logging.warning("Got error...")
     except KeyboardInterrupt:
-        logging.info("received ctrl-c, shutting down...")
+        logging.warning("Got crtl-c...")
+    finally:
         loop.close()
         _unregister(manager_instance.config_file_path)
+
+    exit(0)
