@@ -68,7 +68,17 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
         self.abstract_manager = abstract_manager
 
     def create_user(self, request, context):
-        return self.abstract_manager.create_user(request)
+        try:
+            return self.abstract_manager.create_user(request)
+        except Exception as e:
+            return self.handle_error(e)
+
+    def handle_error(self, e):
+        if hasattr(e, "message"):
+            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
+        if hasattr(e, "args"):
+            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.args)
+        return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
 
     def refresh_resources(self, request, context):
         try:
@@ -76,11 +86,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
             response = messages_pb2.ListResourceResponse(resources=resources)
             return messages_pb2.ResponseMessage(result=messages_pb2.Ok, list_resource=response)
         except Exception as e:
-            if hasattr(e, "message"):
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
-            if hasattr(e, "args"):
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.args)
-            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
+            return self.handle_error(e)
 
     def execute(self, request, context):
         if request.method == messages_pb2.LIST_RESOURCES:
@@ -91,7 +97,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
                                                             user_info=request.user_info,
                                                             payload=request.payload)))
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
+                return self.handle_error(e)
         if request.method == messages_pb2.PROVIDE_RESOURCES:
             try:
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok,
@@ -101,20 +107,20 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
                                                                        user_info=request.user_info,
                                                                        payload=request.payload)]))
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
+                return self.handle_error(e)
         if request.method == messages_pb2.RELEASE_RESOURCES:
             try:
                 self.abstract_manager.release_resources(user_info=request.user_info, payload=request.payload)
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
+                return self.handle_error(e)
 
         if request.method == messages_pb2.VALIDATE_RESOURCES:
             try:
                 self.abstract_manager.validate_resources(user_info=request.user_info, payload=request.payload)
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
             except Exception as e:
-                return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e)
+                return self.handle_error(e)
 
 
 def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
