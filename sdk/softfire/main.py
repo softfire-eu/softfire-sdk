@@ -1,9 +1,10 @@
-import asyncio
+import concurrent
 import logging
 import socket
 import time
+import traceback
 from concurrent import futures
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 import grpc
 
@@ -25,6 +26,7 @@ def _receive_forever(manager_instance):
         while True:
             time.sleep(_ONE_DAY_IN_SECONDS)
     except KeyboardInterrupt:
+        logging.warning("Got ctrl-c shutting down grpc")
         server.stop(0)
 
 
@@ -119,6 +121,7 @@ def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(2)
     result = sock.connect_ex((ex_man_bind_ip, int(ex_man_bind_port)))
+    sock.close()
     return result == 0
 
 
@@ -130,25 +133,36 @@ def start_manager(manager_instance):
     """
     logging.info("Starting %s Manager." % manager_instance.get_config_value('system', 'name'))
 
-    if manager_instance.get_config_value("system", "wait_for_em", "true") == "true":
+    if manager_instance.get_config_value("system", "wait_for_em", "true").lower() == "true":
         while not _is_ex_man__running(manager_instance.get_config_value("system", "experiment_manager_ip", "localhost"),
                                       manager_instance.get_config_value("system", "experiment_manager_port", "5051")):
             time.sleep(2)
-
-    executor = ProcessPoolExecutor(5)
-    loop = asyncio.get_event_loop()
-
-    asyncio.ensure_future(loop.run_in_executor(executor, _receive_forever, manager_instance))
-    asyncio.ensure_future(loop.run_in_executor(executor, _register, manager_instance.config_file_path))
-
+    threads = []
     try:
-        loop.run_forever()
+        with ThreadPoolExecutor(2) as executor:
+            threads.append(executor.submit(_receive_forever, manager_instance))
+            threads.append(executor.submit(_register, manager_instance.config_file_path))
+            cancel = False
+            while True:
+                for t in threads:
+                    try:
+                        if not cancel:
+                            t.result(timeout=3)
+                        else:
+                            if t.running():
+                                t.cancel()
+                    except concurrent.futures.TimeoutError:
+                        pass
+                    except KeyboardInterrupt:
+                        logging.warning("Got crtl-c inside...")
+                        cancel = True
+
     except Exception:
         logging.warning("Got error...")
+        traceback.print_exc()
     except KeyboardInterrupt:
         logging.warning("Got crtl-c...")
     finally:
-        loop.close()
         _unregister(manager_instance.config_file_path)
 
-    exit(0)
+
