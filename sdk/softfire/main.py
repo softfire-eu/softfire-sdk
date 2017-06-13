@@ -1,10 +1,10 @@
-import concurrent
 import logging
 import socket
+import sys
+import threading
 import time
-import traceback
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 
 import grpc
 
@@ -14,7 +14,7 @@ from sdk.softfire.utils import get_config
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
-def _receive_forever(manager_instance):
+def _receive_forever(manager_instance, event: threading.Event):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=int(manager_instance.get_config_value('system', 'server_threads', '5'))))
     messages_pb2_grpc.add_ManagerAgentServicer_to_server(_ManagerAgent(manager_instance), server)
@@ -22,12 +22,10 @@ def _receive_forever(manager_instance):
     logging.info("Start listening on %s" % binding)
     server.add_insecure_port(binding)
     server.start()
-    try:
-        while True:
-            time.sleep(_ONE_DAY_IN_SECONDS)
-    except KeyboardInterrupt:
-        logging.warning("Got ctrl-c shutting down grpc")
+    while event.wait(_ONE_DAY_IN_SECONDS):
+        logging.info("Shutting down gRPC")
         server.stop(0)
+        return
 
 
 def _register(config_file_path):
@@ -143,32 +141,46 @@ def start_manager(manager_instance):
         while not _is_ex_man__running(manager_instance.get_config_value("system", "experiment_manager_ip", "localhost"),
                                       manager_instance.get_config_value("system", "experiment_manager_port", "5051")):
             time.sleep(2)
-    threads = []
-    try:
-        with ThreadPoolExecutor(2) as executor:
-            threads.append(executor.submit(_receive_forever, manager_instance))
-            threads.append(executor.submit(_register, manager_instance.config_file_path))
-            cancel = False
-            while True:
-                for t in threads:
-                    try:
-                        if not cancel:
-                            t.result(timeout=3)
-                        else:
-                            if t.running():
-                                t.cancel()
-                    except concurrent.futures.TimeoutError:
-                        pass
-                    except KeyboardInterrupt:
-                        logging.warning("Got crtl-c inside...")
-                        cancel = True
 
-    except Exception:
-        logging.warning("Got error...")
-        traceback.print_exc()
-    except KeyboardInterrupt:
-        logging.warning("Got crtl-c...")
-    finally:
-        _unregister(manager_instance.config_file_path)
+    event = threading.Event()
+    listen_thread = ExceptionHandlerThread(target=_receive_forever, args=[manager_instance, event])
+    register_thread = ExceptionHandlerThread(target=_register, args=[manager_instance.config_file_path])
+
+    listen_thread.start()
+    register_thread.start()
+
+    while True:
+        try:
+            time.sleep(30)
+        except InterruptedError:
+            _going_down(event, listen_thread, register_thread)
+        except KeyboardInterrupt:
+            _going_down(event, listen_thread, register_thread)
+        finally:
+            _unregister(manager_instance.config_file_path)
+            return
+
+def _going_down(event, listen_thread, register_thread):
+    if listen_thread.is_alive():
+        event.set()
+        listen_thread.join(timeout=5)
+    if register_thread.is_alive():
+        register_thread.join(timeout=3)
 
 
+class ExceptionHandlerThread(Thread):
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+        if sys.version_info > (3, 0):
+            super().__init__(group, target, name, args, kwargs, daemon=daemon)
+        else:
+            super(self.__class__, self).__init__(group, target, name, args, kwargs, daemon=daemon)
+        self.exception = None
+
+    def run(self):
+        try:
+            if sys.version_info > (3, 0):
+                super().run()
+            else:
+                super(self.__class__, self).run()
+        except Exception as e:
+            self.exception = e
