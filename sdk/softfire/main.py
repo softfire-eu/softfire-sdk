@@ -152,13 +152,17 @@ def start_manager(manager_instance):
     while True:
         try:
             time.sleep(30)
+            continue
         except InterruptedError:
             _going_down(event, listen_thread, register_thread)
+            break
         except KeyboardInterrupt:
             _going_down(event, listen_thread, register_thread)
-        finally:
-            _unregister(manager_instance.config_file_path)
-            return
+            break
+
+    _unregister(manager_instance.config_file_path)
+    return
+
 
 def _going_down(event, listen_thread, register_thread):
     if listen_thread.is_alive():
