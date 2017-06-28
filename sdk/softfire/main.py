@@ -1,4 +1,5 @@
 import logging
+import os
 import socket
 import sys
 import threading
@@ -129,12 +130,23 @@ def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
     return result == 0
 
 
+def __print_banner(banner_file_path):
+    if not os.path.isfile(banner_file_path):
+        logging.error('Not printing banner since the file {} does not exist.'.format(banner_file_path))
+        return
+    with open(banner_file_path, 'r') as banner_file:
+        banner = banner_file.read()
+        print(banner)
+
+
 def start_manager(manager_instance):
     """
     Start the ExperimentManager
     :param config_file_path: path to the config file
     :param manager_instance: the instance of the Manager
     """
+    if manager_instance.get_config_value('system','banner-file', '') != '':
+        __print_banner(manager_instance.get_config_value('system','banner-file', ''))
     logging.info("Starting %s Manager." % manager_instance.get_config_value('system', 'name'))
 
     if manager_instance.get_config_value("system", "wait_for_em", "true").lower() == "true":
