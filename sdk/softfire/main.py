@@ -76,7 +76,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
         if hasattr(e, "message"):
             return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
         if hasattr(e, "args"):
-            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.args)
+            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=str(e.args))
         return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
 
     def refresh_resources(self, request, context):
