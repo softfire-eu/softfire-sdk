@@ -82,6 +82,14 @@ class AbstractManager(metaclass=ABCMeta):
         """
         pass
 
+    def delete_user(self, user_info: UserInfo):
+        """
+        Remove the state from the manager and from the southbound components related to the user_info
+        :param user_info: the user to be deleted
+         :type: UserInfo
+        """
+        pass
+
     def _update_status(self) -> dict:
         """
         update the status of the experiments in case of value change

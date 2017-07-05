@@ -4,12 +4,14 @@ import socket
 import sys
 import threading
 import time
+import traceback
 from concurrent import futures
 from threading import Thread
 
 import grpc
 
 from sdk.softfire.grpc import messages_pb2_grpc, messages_pb2
+from sdk.softfire.grpc.messages_pb2 import Empty
 from sdk.softfire.utils import get_config
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -57,7 +59,26 @@ def _unregister(config_file_path):
     logging.debug("Manager received unregistration response: %s" % response.result)
 
 
+def handle_error(e):
+    traceback.print_exc()
+    if hasattr(e, "message"):
+        return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
+    if hasattr(e, "args"):
+        return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=str(e.args))
+    return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
+
+
 class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
+    def delete_user(self, request, context):
+        try:
+            self.abstract_manager.delete_user(request)
+            return Empty()
+        except Exception as e:
+            return handle_error(e)
+
+    def heartbeat(self, request, context):
+        return Empty()
+
     def __init__(self, abstract_manager):
         """
         create the ManagerAgent in charge of dealing with the dispatch of messages
@@ -70,14 +91,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
         try:
             return self.abstract_manager.create_user(request)
         except Exception as e:
-            return self.handle_error(e)
-
-    def handle_error(self, e):
-        if hasattr(e, "message"):
-            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=e.message)
-        if hasattr(e, "args"):
-            return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message=str(e.args))
-        return messages_pb2.ResponseMessage(result=messages_pb2.ERROR, error_message="No message available")
+            return handle_error(e)
 
     def refresh_resources(self, request, context):
         try:
@@ -85,7 +99,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
             response = messages_pb2.ListResourceResponse(resources=resources)
             return messages_pb2.ResponseMessage(result=messages_pb2.Ok, list_resource=response)
         except Exception as e:
-            return self.handle_error(e)
+            return handle_error(e)
 
     def execute(self, request, context):
         if request.method == messages_pb2.LIST_RESOURCES:
@@ -96,7 +110,7 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
                                                             user_info=request.user_info,
                                                             payload=request.payload)))
             except Exception as e:
-                return self.handle_error(e)
+                return handle_error(e)
         if request.method == messages_pb2.PROVIDE_RESOURCES:
             try:
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok,
@@ -106,20 +120,20 @@ class _ManagerAgent(messages_pb2_grpc.ManagerAgentServicer):
                                                                        user_info=request.user_info,
                                                                        payload=request.payload)]))
             except Exception as e:
-                return self.handle_error(e)
+                return handle_error(e)
         if request.method == messages_pb2.RELEASE_RESOURCES:
             try:
                 self.abstract_manager.release_resources(user_info=request.user_info, payload=request.payload)
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
             except Exception as e:
-                return self.handle_error(e)
+                return handle_error(e)
 
         if request.method == messages_pb2.VALIDATE_RESOURCES:
             try:
                 self.abstract_manager.validate_resources(user_info=request.user_info, payload=request.payload)
                 return messages_pb2.ResponseMessage(result=messages_pb2.Ok)
             except Exception as e:
-                return self.handle_error(e)
+                return handle_error(e)
 
 
 def _is_ex_man__running(ex_man_bind_ip, ex_man_bind_port):
@@ -142,11 +156,10 @@ def __print_banner(banner_file_path):
 def start_manager(manager_instance):
     """
     Start the ExperimentManager
-    :param config_file_path: path to the config file
     :param manager_instance: the instance of the Manager
     """
-    if manager_instance.get_config_value('system','banner-file', '') != '':
-        __print_banner(manager_instance.get_config_value('system','banner-file', ''))
+    if manager_instance.get_config_value('system', 'banner-file', '') != '':
+        __print_banner(manager_instance.get_config_value('system', 'banner-file', ''))
     logging.info("Starting %s Manager." % manager_instance.get_config_value('system', 'name'))
 
     if manager_instance.get_config_value("system", "wait_for_em", "true").lower() == "true":
