@@ -32,11 +32,16 @@ def get_config_parser(config_file_path):
         return config
     else:
         logging.error("Config file not found, please create %s" % config_file_path)
-        exit(1)
+        return
 
 
 def get_config(section, key, config_file_path, default=None):
     config = get_config_parser(config_file_path)
+    if not config:
+        if default:
+            return default
+        else:
+            raise FileNotFoundError()
     if default is None:
         return config.get(section=section, option=key)
     try:
