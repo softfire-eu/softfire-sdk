@@ -168,8 +168,8 @@ def start_manager(manager_instance):
             time.sleep(2)
 
     event = threading.Event()
-    listen_thread = ExceptionHandlerThread(target=_receive_forever, args=[manager_instance, event])
-    register_thread = ExceptionHandlerThread(target=_register, args=[manager_instance.config_file_path])
+    listen_thread = ExceptionHandlerThread(target=_receive_forever, args=[manager_instance, event], event=event)
+    register_thread = ExceptionHandlerThread(target=_register, args=[manager_instance.config_file_path], event=event)
 
     listen_thread.start()
     register_thread.start()
@@ -179,6 +179,7 @@ def start_manager(manager_instance):
             time.sleep(30)
             continue
         except InterruptedError:
+            traceback.print_exc()
             _going_down(event, listen_thread, register_thread)
             break
         except KeyboardInterrupt:
@@ -190,26 +191,32 @@ def start_manager(manager_instance):
 
 
 def _going_down(event, listen_thread, register_thread):
+    logging.info("going down...")
+    event.set()
     if listen_thread.is_alive():
-        event.set()
         listen_thread.join(timeout=5)
     if register_thread.is_alive():
         register_thread.join(timeout=3)
 
 
 class ExceptionHandlerThread(Thread):
-    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None, event=None):
         if sys.version_info > (3, 0):
             super().__init__(group, target, name, args, kwargs, daemon=daemon)
         else:
             super(self.__class__, self).__init__(group, target, name, args, kwargs, daemon=daemon)
         self.exception = None
+        self.event = event
 
     def run(self):
-        try:
-            if sys.version_info > (3, 0):
-                super().run()
-            else:
-                super(self.__class__, self).run()
-        except Exception as e:
-            self.exception = e
+        while self.event.wait(_ONE_DAY_IN_SECONDS):
+            try:
+                if sys.version_info > (3, 0):
+                    super().run()
+                else:
+                    super(self.__class__, self).run()
+            except Exception as e:
+                logging.error("Received exeption in thread")
+                traceback.print_exc()
+                logging.debug("Trying to restart...")
+                self.exception = e
