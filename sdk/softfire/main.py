@@ -17,7 +17,7 @@ from sdk.softfire.utils import get_config
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
-def _receive_forever(manager_instance, event: threading.Event):
+def _receive_forever(manager_instance):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=int(manager_instance.get_config_value('system', 'server_threads', '5'))))
     messages_pb2_grpc.add_ManagerAgentServicer_to_server(_ManagerAgent(manager_instance), server)
@@ -25,10 +25,21 @@ def _receive_forever(manager_instance, event: threading.Event):
     logging.info("Start listening on %s" % binding)
     server.add_insecure_port(binding)
     server.start()
-    while event.wait(_ONE_DAY_IN_SECONDS):
+    try:
+        while True:
+            time.sleep(_ONE_DAY_IN_SECONDS)
+    except KeyboardInterrupt:
         logging.info("Shutting down gRPC")
         server.stop(0)
         return
+    except:
+        traceback.print_exc()
+        logging.warning("Did not receive ctrl-c...")
+        logging.debug("Stopping server")
+        server.stop(0)
+        _receive_forever(manager_instance)
+    finally:
+        logging.info("Finished serve forever...")
 
 
 def _register(config_file_path):
@@ -168,7 +179,7 @@ def start_manager(manager_instance):
             time.sleep(2)
 
     event = threading.Event()
-    listen_thread = ExceptionHandlerThread(target=_receive_forever, args=[manager_instance, event], event=event)
+    listen_thread = ExceptionHandlerThread(target=_receive_forever, args=[manager_instance], event=event)
     register_thread = ExceptionHandlerThread(target=_register, args=[manager_instance.config_file_path], event=event)
 
     listen_thread.start()
@@ -183,10 +194,11 @@ def start_manager(manager_instance):
             _going_down(event, listen_thread, register_thread)
             break
         except KeyboardInterrupt:
+            logging.info("Received ctrl-c...")
+            _unregister(manager_instance.config_file_path)
             _going_down(event, listen_thread, register_thread)
             break
 
-    _unregister(manager_instance.config_file_path)
     return
 
 
@@ -201,22 +213,27 @@ def _going_down(event, listen_thread, register_thread):
 
 class ExceptionHandlerThread(Thread):
     def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None, event=None):
+
         if sys.version_info > (3, 0):
             super().__init__(group, target, name, args, kwargs, daemon=daemon)
         else:
             super(self.__class__, self).__init__(group, target, name, args, kwargs, daemon=daemon)
         self.exception = None
         self.event = event
+        self._target = target
+        self._args = args
 
     def run(self):
-        while self.event.wait(_ONE_DAY_IN_SECONDS):
-            try:
-                if sys.version_info > (3, 0):
-                    super().run()
-                else:
-                    super(self.__class__, self).run()
-            except Exception as e:
-                logging.error("Received exeption in thread")
-                traceback.print_exc()
-                logging.debug("Trying to restart...")
-                self.exception = e
+        while True:
+            if not self.event.is_set():
+                try:
+                    self._target(*self._args)
+                    return
+                except KeyboardInterrupt:
+                    logging.info("received ctrl-c")
+                    return
+                except:
+                    logging.error("Received exception in thread")
+                    traceback.print_exc()
+                    logging.debug("Trying to restart...")
+                    time.sleep(1)
