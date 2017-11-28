@@ -37,7 +37,7 @@ class OSClient(object):
         self.admin_tenant_name = self.testbed.get("admin_tenant_name")
         self.admin_project_id = self.testbed.get("admin_project_id")
         if not self.admin_tenant_name and not self.admin_project_id:
-            raise OpenstackClientError("Missing both adimn project id and admin tenant name")
+            raise OpenstackClientError("Missing both admin project id and admin tenant name")
         if self.api_version == 2 and not self.admin_tenant_name:
             raise OpenstackClientError("Missing tenant name required if using v2")
         if self.api_version == 3 and not self.admin_project_id:
@@ -180,9 +180,10 @@ class OSClient(object):
                          "public_key": sosftfire_ssh_pub_key.read()}
                 return self.nova.keypairs.create(**kargs)
         else:
-            kargs = {"name":       keypair_name,
+            kargs = {"name": keypair_name,
                      "public_key": key_file}
             return self.nova.keypairs.create(**kargs)
+
     def get_ext_net(self, ext_net_name='softfire-network'):
         return [ext_net for ext_net in self.neutron.list_networks()['networks'] if
                 ext_net['router:external'] and ext_net['name'] == ext_net_name][0]
@@ -335,6 +336,16 @@ class OSClient(object):
             }
         }
 
+    def upload_image(self, name, path, container_format="bare", disk_format="qcow2"):
+        # image = self.glance.images.create(name=name)
+        # self.glance.images.upload(image.id, open(path, 'rb'))
+
+        with open(path, 'rb') as fimage:
+            img = self.glance.images.create(name=name, is_public="True", disk_format=disk_format,
+                                            container_format=container_format, data=path)
+            # print(dir(self.glance.images))
+            self.glance.images.upload(img.id, fimage)
+
     def list_images(self, tenant_id=None):
         if not self.nova:
             if not tenant_id:
@@ -359,7 +370,7 @@ class OSClient(object):
 
     def set_glance(self, os_tenant_id):
         self.os_tenant_id = os_tenant_id
-        self.glance = Glance('1', session=self._get_session(os_tenant_id))
+        self.glance = Glance('2', session=self._get_session(os_tenant_id))
 
     def _get_tenant_name_from_id(self, os_tenant_id):
         for t in self.list_tenants():
@@ -492,8 +503,6 @@ class OSClient(object):
         for router in routers:
             self.neutron.delete_router(router.get('id'))
 
-
-
     def delete_networks(self, project_id):
         networks = self.list_networks(project_id).get('networks')
         for nw in networks:
@@ -503,8 +512,6 @@ class OSClient(object):
         sec_groups = self.list_sec_group(project_id)
         for sec_group in sec_groups:
             self.neutron.delete_security_group(sec_group.get('id'))
-
-
 
 
 def _list_images_single_tenant(tenant_name, testbed, testbed_name):
