@@ -336,13 +336,18 @@ class OSClient(object):
             }
         }
 
-    def upload_image(self, name, path, container_format="bare", disk_format="qcow2"):
+    def upload_image(self, name, path, container_format="bare", disk_format="qcow2", visibility="public"):
         # image = self.glance.images.create(name=name)
         # self.glance.images.upload(image.id, open(path, 'rb'))
 
         with open(path, 'rb') as fimage:
-            img = self.glance.images.create(name=name, is_public="True", disk_format=disk_format,
-                                            container_format=container_format, data=path)
+            img = self.glance.images.create(name=name,
+                                            # is_public="True",
+                                            # public="True",
+                                            visibility=visibility,
+                                            disk_format=disk_format,
+                                            container_format=container_format,
+                                            data=path)
             # print(dir(self.glance.images))
             self.glance.images.upload(img.id, fimage)
 
