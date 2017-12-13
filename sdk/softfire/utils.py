@@ -1,7 +1,6 @@
 import configparser
 import json
 import logging
-import logging.config
 import os
 
 from sdk.softfire.grpc import messages_pb2

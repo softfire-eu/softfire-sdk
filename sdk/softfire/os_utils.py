@@ -6,13 +6,13 @@ import keystoneclient
 import neutronclient
 from glanceclient import Client as Glance
 from keystoneauth1 import session
-from keystoneauth1.identity import v2, v3
 from keystoneauth1.exceptions.http import Conflict
+from keystoneauth1.identity import v2, v3
 from neutronclient.common.exceptions import IpAddressGenerationFailureClient
 from neutronclient.v2_0.client import Client as Neutron
 from novaclient.client import Client as Nova
 
-from sdk.softfire.utils import OpenstackClientError, get_config
+from sdk.softfire.utils import OpenstackClientError, get_testbed_name_from_id, get_openstack_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,9 @@ class OSClient(object):
         self.sec_group = None
         self.os_tenant_id = None
 
-        logger.debug("Log level is: %s and DEBUG is %s" % (logger.getEffectiveLevel(), logging.DEBUG))
-        if logger.getEffectiveLevel() == logging.DEBUG:
-            logging.basicConfig(level=logging.DEBUG)
+        # logger.debug("Log level is: %s and DEBUG is %s" % (logger.getEffectiveLevel(), logging.DEBUG))
+        # if logger.getEffectiveLevel() == logging.DEBUG:
+        #     logging.basicConfig(level=logging.DEBUG)
 
         if not tenant_name and not project_id:
 
@@ -188,7 +188,7 @@ class OSClient(object):
         return [ext_net for ext_net in self.neutron.list_networks()['networks'] if
                 ext_net['router:external'] and ext_net['name'] == ext_net_name][0]
 
-    def allocate_floating_ips(self, fip_num=0, ext_net='softfire-network'):
+    def allocate_floating_ips(self, ext_net, fip_num=0):
         body = {
             "floatingip": {
                 "floating_network_id": ext_net['id']
@@ -501,7 +501,7 @@ class OSClient(object):
                 except Exception as e:
                     pass
             else:
-                logger.warn('No subnet found that is associated to router {}'.format(router.get('id')))
+                logger.warning('No subnet found that is associated to router {}'.format(router.get('id')))
 
     def delete_routers(self, project_id):
         routers = self.list_routers(project_id).get('routers')
@@ -531,8 +531,7 @@ def _list_images_single_tenant(tenant_name, testbed, testbed_name):
     return result
 
 
-def list_images(tenant_name, testbed_name=None):
-    openstack_credentials = get_openstack_credentials()
+def list_images(openstack_credentials, tenant_name, testbed_name=None):
     images = []
     if not testbed_name:
         for name, testbed in openstack_credentials.items():
@@ -548,8 +547,7 @@ def list_images(tenant_name, testbed_name=None):
     return images
 
 
-def create_os_project(username, password, tenant_name, testbed_name=None):
-    openstack_credentials = get_openstack_credentials()
+def create_os_project(openstack_credentials, username, password, tenant_name, testbed_name=None):
     os_tenants = {}
     if not testbed_name:
         for name, testbed in openstack_credentials.items():
@@ -565,7 +563,7 @@ def create_os_project(username, password, tenant_name, testbed_name=None):
     else:
         os_tenant_id, vim_instance = _create_single_project(tenant_name,
                                                             openstack_credentials[testbed_name],
-                                                            testbed_name)
+                                                            testbed_name, username, password)
         os_tenants[testbed_name] = {'tenant_id': os_tenant_id, 'vim_instance': vim_instance}
     return os_tenants
 
@@ -585,9 +583,9 @@ def _create_single_project(tenant_name, testbed, testbed_name, username, passwor
     logger.debug("Got Role %s" % admin_role)
     for tenant in os_client.list_tenants():
         if tenant.name == tenant_name:
-            logger.warn("Tenant with name or id %s exists already! I assume a double registration i will not do "
-                        "anything :)" % tenant_name)
-            logger.warn("returning tenant id %s" % tenant.id)
+            logger.warning("Tenant with name or id %s exists already! I assume a double registration i will not do "
+                           "anything :)" % tenant_name)
+            logger.warning("returning tenant id %s" % tenant.id)
 
             exp_user = os_client.get_user(username)
             if not exp_user:
@@ -627,9 +625,9 @@ def _create_single_project(tenant_name, testbed, testbed_name, username, passwor
         fips = testbed.get("allocate-fip")
         if fips is not None and int(fips) > 0:
             try:
-                os_client.allocate_floating_ips(int(fips), ext_net)
+                os_client.allocate_floating_ips(ext_net, int(fips))
             except OpenstackClientError as e:
-                logger.warn(e.args)
+                logger.warning(e.args)
 
     except:
         logger.warning("Not able to get ext net")
@@ -646,8 +644,7 @@ def get_username_hash(username):
     return abs(hash(username))
 
 
-def delete_tenant_and_user(username, testbed_tenants):
-    openstack_credentials = get_openstack_credentials()
+def delete_tenant_and_user(openstack_credentials, username, testbed_tenants):
     for testbed_id, project_id in testbed_tenants.items():
         for testbed_name, credentials in openstack_credentials.items():
             if get_testbed_name_from_id(testbed_id) == testbed_name:
@@ -664,7 +661,7 @@ def delete_tenant_and_user(username, testbed_tenants):
 
 
 if __name__ == '__main__':
-    for testbed_name, credentials in get_openstack_credentials().items():
+    for testbed_name, credentials in get_openstack_credentials('/etc/softfire/openstack-credentials.json').items():
         print("Executing list test on testbed %s" % testbed_name)
         client = OSClient(testbed_name, credentials)
         project_id = credentials.get("admin_project_id")
