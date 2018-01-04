@@ -289,10 +289,8 @@ class OSClient(object):
                 sec_group['security_group'] = sg
                 break
         if len(sec_group) == 0:
-            body = {"security_group": {
-                'name': sec_g_name,
-                'description': 'openbaton security group',
-            }}
+            body = dict(security_group=dict(name=sec_g_name, description="openbaton security group"),
+                        project_id=project_id, tenant_id=project_id)
             sec_group = self.neutron.create_security_group(body=body)
             self.create_rule(sec_group, 'tcp')
             self.create_rule(sec_group, 'udp')
@@ -300,12 +298,13 @@ class OSClient(object):
         self.sec_group = sec_group['security_group']
         return self.sec_group
 
+
     def list_sec_group(self, os_project_id):
         if not self.neutron:
             self.set_neutron(os_project_id)
         return [sec for sec in self.neutron.list_security_groups()['security_groups'] if
                 (sec.get('tenant_id') is not None and sec.get('tenant_id') == os_project_id) or (
-                    sec.get('project_id') is not None and sec.get('project_id') == os_project_id)]
+                        sec.get('project_id') is not None and sec.get('project_id') == os_project_id)]
 
     def get_vim_instance(self, tenant_name, username=None, password=None):
         if username:
@@ -469,10 +468,13 @@ class OSClient(object):
             traceback.print_exc()
             logger.error("Not Able to delete project %s" % project_id)
 
-    def release_floating_ips(self, project_id):
+    def release_floating_ips(self, project_id, keep_fip_id_list=list()):
         fips = self.list_floatingips(project_id).get('floatingips')
         for fip in fips:
-            self.neutron.delete_floatingip(fip.get('id'))
+            if fip.get('id') in keep_fip_id_list:
+                logger.debug("Not relasing floating ip: %s" % fip)
+            else:
+                self.neutron.delete_floatingip(fip.get('id'))
 
     def delete_ports(self, project_id):
         ports = self.list_ports(project_id).get('ports')
