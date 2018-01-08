@@ -404,7 +404,9 @@ class OSClient(object):
             if not project_id:
                 raise OpenstackClientError("Missing project_id!")
             self.set_neutron(project_id)
-        return self.neutron.list_networks(tenant_id=project_id).get("networks")
+        return [net for net in self.neutron.list_networks(retrieve_all=True).get("networks") if
+                (net.get('project_id') is not None and net.get('project_id') == project_id) or net.get(
+                    'shared') or net.get('router:external')]
 
     def list_subnets(self, project_id):
         if not self.neutron:
