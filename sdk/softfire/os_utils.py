@@ -1,9 +1,9 @@
 import logging
-import os
 import traceback
 
 import keystoneclient
 import neutronclient
+import os
 from glanceclient import Client as Glance
 from keystoneauth1 import session
 from keystoneauth1.exceptions.http import Conflict
@@ -11,7 +11,6 @@ from keystoneauth1.identity import v2, v3
 from neutronclient.common.exceptions import IpAddressGenerationFailureClient
 from neutronclient.v2_0.client import Client as Neutron
 from novaclient.client import Client as Nova
-
 from sdk.softfire.utils import OpenstackClientError, get_testbed_name_from_id, get_openstack_credentials
 
 logger = logging.getLogger(__name__)
@@ -405,7 +404,7 @@ class OSClient(object):
             if not project_id:
                 raise OpenstackClientError("Missing project_id!")
             self.set_neutron(project_id)
-        return self.neutron.list_networks(tenant_id=project_id)
+        return self.neutron.list_networks(tenant_id=project_id).get("networks")
 
     def list_subnets(self, project_id):
         if not self.neutron:
@@ -419,7 +418,11 @@ class OSClient(object):
             if not project_id:
                 raise OpenstackClientError("Missing project_id!")
             self.set_neutron(project_id)
-        return self.neutron.list_floatingips(tenant_id=project_id)
+        floatingips = self.neutron.list_floatingips(tenant_id=project_id)
+        if floatingips:
+            return floatingips.get("floatingips")
+        else:
+            return []
 
     def list_routers(self, project_id):
         if not self.neutron:
@@ -468,8 +471,9 @@ class OSClient(object):
             traceback.print_exc()
             logger.error("Not Able to delete project %s" % project_id)
 
+
     def release_floating_ips(self, project_id, keep_fip_id_list=list()):
-        fips = self.list_floatingips(project_id).get('floatingips')
+        fips = self.list_floatingips(project_id)
         for fip in fips:
             if fip.get('id') in keep_fip_id_list:
                 logger.debug("Not relasing floating ip: %s" % fip)
@@ -511,7 +515,7 @@ class OSClient(object):
             self.neutron.delete_router(router.get('id'))
 
     def delete_networks(self, project_id):
-        networks = self.list_networks(project_id).get('networks')
+        networks = self.list_networks(project_id)
         for nw in networks:
             self.neutron.delete_network(nw.get('id'))
 
