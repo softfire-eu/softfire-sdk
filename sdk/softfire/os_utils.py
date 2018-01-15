@@ -1,9 +1,9 @@
 import logging
+import os
 import traceback
 
 import keystoneclient
 import neutronclient
-import os
 from glanceclient import Client as Glance
 from keystoneauth1 import session
 from keystoneauth1.exceptions.http import Conflict
@@ -11,6 +11,7 @@ from keystoneauth1.identity import v2, v3
 from neutronclient.common.exceptions import IpAddressGenerationFailureClient
 from neutronclient.v2_0.client import Client as Neutron
 from novaclient.client import Client as Nova
+
 from sdk.softfire.utils import OpenstackClientError, get_testbed_name_from_id, get_openstack_credentials
 
 logger = logging.getLogger(__name__)
@@ -297,13 +298,12 @@ class OSClient(object):
         self.sec_group = sec_group['security_group']
         return self.sec_group
 
-
     def list_sec_group(self, os_project_id):
         if not self.neutron:
             self.set_neutron(os_project_id)
         return [sec for sec in self.neutron.list_security_groups()['security_groups'] if
                 (sec.get('tenant_id') is not None and sec.get('tenant_id') == os_project_id) or (
-                        sec.get('project_id') is not None and sec.get('project_id') == os_project_id)]
+                    sec.get('project_id') is not None and sec.get('project_id') == os_project_id)]
 
     def get_vim_instance(self, tenant_name, username=None, password=None):
         if username:
@@ -399,6 +399,11 @@ class OSClient(object):
     def list_users(self):
         return self.keystone.users.list()
 
+    def list_server(self, project_id):
+        if not self.nova:
+            self.set_nova(project_id)
+        return self.nova.servers.list()
+
     def list_networks(self, project_id=None):
         if not self.neutron:
             if not project_id:
@@ -463,6 +468,11 @@ class OSClient(object):
             traceback.print_exc()
             logger.error("Not Able to delete user %s" % username)
 
+    def delete_server(self, server_id, project_id):
+        if not self.nova:
+            self.set_nova(project_id)
+        self.nova.servers.delete(server_id)
+
     def delete_project(self, project_id):
         try:
             if self.api_version == 2:
@@ -472,7 +482,6 @@ class OSClient(object):
         except:
             traceback.print_exc()
             logger.error("Not Able to delete project %s" % project_id)
-
 
     def release_floating_ips(self, project_id, keep_fip_id_list=list()):
         fips = self.list_floatingips(project_id)
