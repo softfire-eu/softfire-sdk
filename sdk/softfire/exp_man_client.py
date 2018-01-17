@@ -27,7 +27,7 @@ class ExpManClient(object):
                                                                                                 experiment_manager_port)
         self.experiment_manager_get_status_url = 'http://{}:{}/get_status'.format(experiment_manager_ip,
                                                                                   experiment_manager_port)
-        self.experiment_manager_get_resources_url = 'http://{}:{}/resources'.format(experiment_manager_ip,
+        self.experiment_manager_get_resources_url = 'http://{}:{}/get_resources'.format(experiment_manager_ip,
                                                                                     experiment_manager_port)
         self.session = self._log_in(username=username, password=password)
 
@@ -139,4 +139,6 @@ class ExpManClient(object):
         raise ExperimentManagerClientError("Resource with id %s not found" % used_resource_id)
 
     def get_all_resources(self):
-        return self.session.get(self.experiment_manager_get_resources_url)
+        response = self.session.get(self.experiment_manager_get_resources_url)
+        self.__validate_response_status(response, 200)
+        return json.loads(response.text)
