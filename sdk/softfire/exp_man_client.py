@@ -29,6 +29,8 @@ class ExpManClient(object):
                                                                                   experiment_manager_port)
         self.experiment_manager_get_resources_url = 'http://{}:{}/get_resources'.format(experiment_manager_ip,
                                                                                     experiment_manager_port)
+        self.experiment_manager_get_experimenters_url = 'http://{}:{}/experimenters'.format(experiment_manager_ip,
+                                                                                            experiment_manager_port)
         self.session = self._log_in(username=username, password=password)
 
     def _log_in(self, username, password):
@@ -140,5 +142,10 @@ class ExpManClient(object):
 
     def get_all_resources(self):
         response = self.session.get(self.experiment_manager_get_resources_url)
+        self.__validate_response_status(response, 200)
+        return json.loads(response.text)
+
+    def get_all_experimenters(self):
+        response = self.session.get(self.experiment_manager_get_experimenters_url)
         self.__validate_response_status(response, 200)
         return json.loads(response.text)
