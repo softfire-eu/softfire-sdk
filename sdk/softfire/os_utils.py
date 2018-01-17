@@ -70,7 +70,7 @@ class OSClient(object):
             logger.debug("Creating keystone client")
             if self.api_version == 3:
                 self.keystone = self._create_keystone_client(project_id)
-                self.os_tenant_id = project_id
+                self.os_tenant_id = self.project_id = project_id
             else:
                 self.keystone = self._create_keystone_client(tenant_name)
                 self.os_tenant_id = self.project_id = self._get_tenant_id_from_name(tenant_name)
