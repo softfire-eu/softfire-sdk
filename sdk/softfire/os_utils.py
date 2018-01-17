@@ -402,7 +402,9 @@ class OSClient(object):
     def list_server(self, project_id):
         if not self.nova:
             self.set_nova(project_id)
-        return self.nova.servers.list()
+        return [s for s in self.nova.servers.list() if (hasattr(s, 'project_id') and s.project_id == project_id) or (
+        hasattr(s, 'tenant_id') and s.tenant_id == project_id)]
+        # return self.nova.servers.list()
 
     def list_networks(self, project_id=None):
         if not self.neutron:
@@ -459,7 +461,13 @@ class OSClient(object):
         for p in self.list_tenants():
             if p.id == tenant_id:
                 return p
-        raise OpenstackClientError("Project with id %s not found")
+        raise OpenstackClientError("Project with id %s not found" % tenant_id)
+
+    def get_project_from_name(self, project_name):
+        for p in self.list_tenants():
+            if p.name == project_name:
+                return p
+        raise OpenstackClientError("Project with name %s not found" % project_name)
 
     def delete_user(self, username):
         try:
