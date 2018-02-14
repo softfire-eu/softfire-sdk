@@ -19,7 +19,7 @@ The easiest way to implement a new sub manager is to consider the following.
 ## Installation and configuration
 Proceed installing the softfire-sdk: `:::bash pip install softfire-sdk`
 
-### create the python manager
+## create the python manager
 
 ```python
 from sdk.softfire.manager import AbstractManager
