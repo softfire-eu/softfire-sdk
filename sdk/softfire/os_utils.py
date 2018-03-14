@@ -402,7 +402,8 @@ class OSClient(object):
     def list_server(self, project_id):
         if not self.nova:
             self.set_nova(project_id)
-        return [s for s in self.nova.servers.list() if (hasattr(s, 'project_id') and s.project_id == project_id) or (
+        all_servers = self.nova.servers.list(search_opts={'all_tenants': 1})
+        return [s for s in all_servers if (hasattr(s, 'project_id') and s.project_id == project_id) or (
         hasattr(s, 'tenant_id') and s.tenant_id == project_id)]
         # return self.nova.servers.list()
 
