@@ -28,8 +28,10 @@ class ExpManClient(object):
         self.experiment_manager_get_status_url = 'http://{}:{}/get_status'.format(experiment_manager_ip,
                                                                                   experiment_manager_port)
         self.experiment_manager_get_resources_url = 'http://{}:{}/get_resources'.format(experiment_manager_ip,
-                                                                                    experiment_manager_port)
+                                                                                        experiment_manager_port)
         self.experiment_manager_get_experimenters_url = 'http://{}:{}/experimenters'.format(experiment_manager_ip,
+                                                                                            experiment_manager_port)
+        self.experiment_manager_create_certificate_url = 'http://{}:{}/certificates'.format(experiment_manager_ip,
                                                                                             experiment_manager_port)
         self.session = self._log_in(username=username, password=password)
 
@@ -149,3 +151,9 @@ class ExpManClient(object):
         response = self.session.get(self.experiment_manager_get_experimenters_url)
         self.__validate_response_status(response, 200)
         return json.loads(response.text)
+
+    def create_certificate(self, username, password, days):
+        response = self.session.post(self.experiment_manager_create_certificate_url,
+                                     data={'username': username, 'password': password, 'days': days})
+        self.__validate_response_status(response, 200)
+        return response.text
