@@ -4,6 +4,7 @@ import os
 import traceback
 
 import requests
+import time
 
 from sdk.softfire.utils import ExperimentManagerClientError
 
@@ -96,6 +97,7 @@ class ExpManClient(object):
         if wait_for:
             for x in range(0, timeout, 5):
                 self.check_user(new_user_name)
+                time.sleep(5)
 
     def delete_user(self, user_name_to_delete):
         self.log.debug('Try to delete the user named \'{}\'.'.format(user_name_to_delete))
