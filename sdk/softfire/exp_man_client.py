@@ -96,7 +96,8 @@ class ExpManClient(object):
         self.log.debug('Triggered the creation of a new user named \'{}\'.'.format(new_user_name))
         if wait_for:
             for x in range(0, timeout, 5):
-                self.check_user(new_user_name)
+                if self.check_user(new_user_name):
+                    return
                 time.sleep(5)
 
     def delete_user(self, user_name_to_delete):
